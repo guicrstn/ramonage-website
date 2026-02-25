@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Nunito', 'Nunito Fallback', sans-serif;
-  --font-serif: 'Quicksand', 'Quicksand Fallback', sans-serif;
+  --font-sans: 'Montserrat', 'Montserrat Fallback', sans-serif;
+  --font-serif: 'Lora', 'Lora Fallback', serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
