@@ -99,16 +99,16 @@ export default function ServicesPage() {
             fill
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-foreground/80" />
+          <div className="absolute inset-0 bg-[#1A1A1A]/85" />
         </div>
         <div className="relative mx-auto max-w-7xl px-4 py-20 lg:px-8 lg:py-28">
-          <p className="text-sm font-semibold uppercase tracking-wider text-secondary">
+          <p className="text-sm font-bold uppercase tracking-wider text-[#F5A623]">
             Nos prestations
           </p>
-          <h1 className="mt-2 max-w-2xl font-serif text-4xl font-bold text-background md:text-5xl">
+          <h1 className="mt-2 max-w-2xl font-serif text-4xl font-extrabold text-white md:text-5xl">
             <span className="text-balance">Services professionnels de ramonage et fumisterie</span>
           </h1>
-          <p className="mt-4 max-w-xl text-lg text-background/70">
+          <p className="mt-4 max-w-xl text-lg text-white/70">
             Des interventions de qualite pour assurer votre securite et le bon fonctionnement de vos installations.
           </p>
         </div>
@@ -124,12 +124,12 @@ export default function ServicesPage() {
                 className="overflow-hidden border-border bg-card"
               >
                 <CardContent className="flex flex-col gap-6 p-8 md:flex-row md:items-start md:gap-8">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                    <service.icon className="h-7 w-7 text-primary" />
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#CC0000]/10">
+                    <service.icon className="h-7 w-7 text-[#CC0000]" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F5A623] text-xs font-bold text-[#1A1A1A]">
                         {index + 1}
                       </span>
                       <h2 className="font-serif text-xl font-bold text-card-foreground">
@@ -142,7 +142,7 @@ export default function ServicesPage() {
                     <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                       {service.features.map((feature) => (
                         <li key={feature} className="flex items-center gap-2 text-sm text-card-foreground">
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-[#CC0000]" />
                           {feature}
                         </li>
                       ))}
@@ -157,7 +157,7 @@ export default function ServicesPage() {
             <Button
               asChild
               size="lg"
-              className="bg-primary px-8 text-lg font-semibold text-primary-foreground hover:bg-primary/90"
+              className="bg-[#CC0000] px-8 text-lg font-bold text-white shadow-lg shadow-[#CC0000]/20 hover:bg-[#B30000]"
             >
               <Link href="/rendez-vous" className="flex items-center gap-2">
                 <CalendarDays className="h-5 w-5" />

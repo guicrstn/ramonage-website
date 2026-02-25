@@ -27,10 +27,10 @@ export function Testimonials() {
     <section className="bg-muted py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+          <p className="text-sm font-bold uppercase tracking-wider text-[#CC0000]">
             Temoignages
           </p>
-          <h2 className="mt-2 font-serif text-3xl font-bold text-foreground md:text-4xl">
+          <h2 className="mt-2 font-serif text-3xl font-extrabold text-foreground md:text-4xl">
             <span className="text-balance">Ce que disent nos clients</span>
           </h2>
         </div>
@@ -39,17 +39,17 @@ export function Testimonials() {
           {testimonials.map((t) => (
             <Card key={t.name} className="border-border bg-card">
               <CardContent className="flex flex-col gap-4 p-6">
-                <Quote className="h-8 w-8 text-secondary/40" />
+                <Quote className="h-8 w-8 text-[#F5A623]/40" />
                 <div className="flex gap-1">
                   {Array.from({ length: t.rating }).map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-secondary text-secondary" />
+                    <Star key={i} className="h-4 w-4 fill-[#F5A623] text-[#F5A623]" />
                   ))}
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {`"${t.text}"`}
                 </p>
                 <div className="mt-auto border-t border-border pt-4">
-                  <p className="text-sm font-semibold text-card-foreground">{t.name}</p>
+                  <p className="text-sm font-bold text-card-foreground">{t.name}</p>
                   <p className="text-xs text-muted-foreground">{t.location}</p>
                 </div>
               </CardContent>

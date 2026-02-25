@@ -35,10 +35,10 @@ export function ServicesPreview() {
     <section className="bg-background py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+          <p className="text-sm font-bold uppercase tracking-wider text-[#CC0000]">
             Nos prestations
           </p>
-          <h2 className="mt-2 font-serif text-3xl font-bold text-foreground md:text-4xl">
+          <h2 className="mt-2 font-serif text-3xl font-extrabold text-foreground md:text-4xl">
             <span className="text-balance">Des services complets pour votre securite</span>
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
@@ -50,11 +50,11 @@ export function ServicesPreview() {
           {services.map((service) => (
             <Card
               key={service.title}
-              className="group border-border bg-card transition-all hover:-translate-y-1 hover:shadow-lg"
+              className="group border-border bg-card transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-[#CC0000]/5"
             >
               <CardContent className="flex flex-col gap-4 p-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <service.icon className="h-6 w-6 text-primary" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#CC0000]/10">
+                  <service.icon className="h-6 w-6 text-[#CC0000]" />
                 </div>
                 <h3 className="font-serif text-lg font-bold text-card-foreground">
                   {service.title}
@@ -71,7 +71,7 @@ export function ServicesPreview() {
           <Button
             asChild
             variant="outline"
-            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            className="border-[#CC0000] font-bold text-[#CC0000] hover:bg-[#CC0000] hover:text-white"
           >
             <Link href="/services" className="flex items-center gap-2">
               Voir tous nos services

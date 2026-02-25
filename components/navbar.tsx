@@ -28,10 +28,10 @@ export function Navbar() {
             className="h-12 w-auto"
           />
           <div className="hidden sm:block">
-            <p className="font-serif text-lg font-bold leading-tight text-foreground">
+            <p className="font-serif text-lg font-extrabold leading-tight text-[#CC0000]">
               L.B Ramonage
             </p>
-            <p className="text-xs text-muted-foreground">Fumisterie</p>
+            <p className="text-xs font-semibold text-[#F5A623]">Fumisterie</p>
           </div>
         </Link>
 
@@ -41,7 +41,7 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-foreground transition-colors hover:text-primary"
+              className="text-sm font-semibold text-foreground transition-colors hover:text-[#CC0000]"
             >
               {link.label}
             </Link>
@@ -49,11 +49,11 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a href="tel:+33600000000" className="flex items-center gap-2 text-sm font-medium text-primary">
+          <a href="tel:+33600000000" className="flex items-center gap-2 text-sm font-bold text-[#CC0000]">
             <Phone className="h-4 w-4" />
             <span>06 00 00 00 00</span>
           </a>
-          <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button asChild className="bg-[#CC0000] font-bold text-white hover:bg-[#B30000]">
             <Link href="/rendez-vous">Prendre RDV</Link>
           </Button>
         </div>
@@ -61,7 +61,7 @@ export function Navbar() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="md:hidden"
+          className="text-foreground md:hidden"
           aria-label={isOpen ? "Fermer le menu" : "Ouvrir le menu"}
         >
           {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -77,19 +77,19 @@ export function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setIsOpen(false)}
-                className="border-b border-border py-3 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                className="border-b border-border py-3 text-sm font-semibold text-foreground transition-colors hover:text-[#CC0000]"
               >
                 {link.label}
               </Link>
             ))}
             <a
               href="tel:+33600000000"
-              className="flex items-center gap-2 py-3 text-sm font-medium text-primary"
+              className="flex items-center gap-2 py-3 text-sm font-bold text-[#CC0000]"
             >
               <Phone className="h-4 w-4" />
               06 00 00 00 00
             </a>
-            <Button asChild className="mt-2 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button asChild className="mt-2 bg-[#CC0000] font-bold text-white hover:bg-[#B30000]">
               <Link href="/rendez-vous" onClick={() => setIsOpen(false)}>
                 Prendre RDV
               </Link>

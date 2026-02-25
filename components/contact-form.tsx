@@ -54,10 +54,10 @@ export function ContactForm() {
     return (
       <Card className="border-border bg-card">
         <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-chart-3/10">
-            <CheckCircle2 className="h-8 w-8 text-chart-3" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#2E7D32]/10">
+            <CheckCircle2 className="h-8 w-8 text-[#2E7D32]" />
           </div>
-          <h3 className="font-serif text-2xl font-bold text-card-foreground">
+          <h3 className="font-serif text-2xl font-extrabold text-card-foreground">
             Message envoye !
           </h3>
           <p className="max-w-md text-muted-foreground">
@@ -69,7 +69,7 @@ export function ContactForm() {
               setForm({ full_name: "", email: "", phone: "", subject: "", message: "" })
             }}
             variant="outline"
-            className="mt-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            className="mt-2 border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white"
           >
             Envoyer un autre message
           </Button>
@@ -82,7 +82,7 @@ export function ContactForm() {
     <Card className="border-border bg-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 font-serif text-xl text-card-foreground">
-          <Send className="h-5 w-5 text-primary" />
+          <Send className="h-5 w-5 text-[#CC0000]" />
           Nous contacter
         </CardTitle>
         <CardDescription>
@@ -158,7 +158,7 @@ export function ContactForm() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-[#CC0000] font-bold text-white hover:bg-[#B30000]"
             size="lg"
           >
             {isSubmitting ? (

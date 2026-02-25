@@ -45,13 +45,13 @@ export default function ContactPage() {
       {/* Header */}
       <section className="bg-foreground py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 lg:px-8">
-          <p className="text-sm font-semibold uppercase tracking-wider text-secondary">
+          <p className="text-sm font-bold uppercase tracking-wider text-[#F5A623]">
             Contactez-nous
           </p>
-          <h1 className="mt-2 font-serif text-4xl font-bold text-background md:text-5xl">
+          <h1 className="mt-2 font-serif text-4xl font-extrabold text-white md:text-5xl">
             Nous sommes a votre ecoute
           </h1>
-          <p className="mt-4 max-w-xl text-lg text-background/70">
+          <p className="mt-4 max-w-xl text-lg text-white/70">
             Une question, un devis, un renseignement ? N{"'"}hesitez pas a nous contacter par telephone, email ou via le formulaire.
           </p>
         </div>
@@ -73,15 +73,15 @@ export default function ContactPage() {
                   key={info.label}
                   className="flex items-start gap-4 rounded-lg border border-border bg-card p-5"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <info.icon className="h-5 w-5 text-primary" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#CC0000]/10">
+                    <info.icon className="h-5 w-5 text-[#CC0000]" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-card-foreground">{info.label}</h3>
                     {info.href ? (
                       <a
                         href={info.href}
-                        className="mt-1 text-sm text-primary hover:underline"
+                        className="mt-1 text-sm text-[#CC0000] hover:underline"
                       >
                         {info.value}
                       </a>

@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Playfair_Display } from 'next/font/google'
+import { Nunito, Quicksand } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import './globals.css'
 
-const _inter = Inter({ subsets: ["latin"] })
-const _playfair = Playfair_Display({ subsets: ["latin"] })
+const _nunito = Nunito({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] })
+const _quicksand = Quicksand({ subsets: ["latin"], weight: ["400", "500", "600", "700"] })
 
 export const metadata: Metadata = {
   title: 'L.B Ramonage / Fumisterie - Ramonage professionnel',
