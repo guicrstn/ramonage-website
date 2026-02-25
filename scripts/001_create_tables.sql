@@ -42,6 +42,18 @@ ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blocked_slots ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "Anyone can create appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Authenticated users can view appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Authenticated users can update appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Authenticated users can delete appointments" ON public.appointments;
+DROP POLICY IF EXISTS "Anyone can send contact messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Authenticated users can view messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Authenticated users can update messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Authenticated users can delete messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Authenticated users can manage blocked slots" ON public.blocked_slots;
+DROP POLICY IF EXISTS "Anyone can view blocked slots" ON public.blocked_slots;
+
 -- Appointments: anyone can insert (public booking), authenticated users can do everything
 CREATE POLICY "Anyone can create appointments" ON public.appointments
   FOR INSERT WITH CHECK (true);
@@ -68,10 +80,9 @@ CREATE POLICY "Authenticated users can update messages" ON public.contact_messag
 CREATE POLICY "Authenticated users can delete messages" ON public.contact_messages
   FOR DELETE USING (auth.role() = 'authenticated');
 
--- Blocked slots: authenticated can manage
+-- Blocked slots: authenticated can manage, anyone can view
 CREATE POLICY "Authenticated users can manage blocked slots" ON public.blocked_slots
   FOR ALL USING (auth.role() = 'authenticated');
 
--- Anyone can view blocked slots (to show unavailability on booking form)
 CREATE POLICY "Anyone can view blocked slots" ON public.blocked_slots
   FOR SELECT USING (true);
