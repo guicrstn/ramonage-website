@@ -29,9 +29,8 @@ export function Navbar() {
           />
           <div className="hidden sm:block">
             <p className="font-serif text-lg font-extrabold leading-tight text-[#CC0000]">
-              L.B Ramonage
+              L.B RAMONAGE
             </p>
-            <p className="text-xs font-semibold text-[#F5A623]">Fumisterie</p>
           </div>
         </Link>
 
