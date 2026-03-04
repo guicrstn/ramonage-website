@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { Resend } from "resend"
 
-// This API sends email notifications
-// For production, integrate with Resend (resend.com) - 3000 emails/month free
-// For now, this logs the notification and returns success
-// To enable real emails: pnpm add resend, then uncomment the Resend code below
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+// Email de l'admin qui recoit les notifications de nouveau RDV
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@lb-ramonage.fr"
+// L'adresse d'envoi - par defaut Resend fournit onboarding@resend.dev
+// Pour utiliser votre propre domaine, configurez-le dans le dashboard Resend
+const FROM_EMAIL = process.env.FROM_EMAIL || "L.B Ramonage <onboarding@resend.dev>"
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,20 +45,95 @@ export async function POST(request: NextRequest) {
     const time = appointment.preferred_time
 
     let subject = ""
-    let body = ""
+    let htmlBody = ""
 
     switch (type) {
       case "confirmed":
         subject = "Votre rendez-vous L.B Ramonage est confirme"
-        body = `Bonjour ${clientName},\n\nVotre rendez-vous de ramonage a ete confirme pour le ${date} a ${time}.\n\nAdresse d'intervention : ${appointment.address}, ${appointment.city}\n\nEn cas d'empechement, merci de nous contacter au plus vite.\n\nCordialement,\nL.B Ramonage / Fumisterie`
+        htmlBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #CC0000; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 20px;">L.B Ramonage / Fumisterie</h1>
+            </div>
+            <div style="padding: 30px; background: #f9f9f9;">
+              <h2 style="color: #1A1A1A;">Rendez-vous confirme</h2>
+              <p>Bonjour <strong>${clientName}</strong>,</p>
+              <p>Votre rendez-vous de ramonage a ete <strong style="color: #2E7D32;">confirme</strong> :</p>
+              <div style="background: white; border-left: 4px solid #CC0000; padding: 15px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>Date :</strong> ${date}</p>
+                <p style="margin: 5px 0;"><strong>Heure :</strong> ${time}</p>
+                <p style="margin: 5px 0;"><strong>Adresse :</strong> ${appointment.address}, ${appointment.city}</p>
+                <p style="margin: 5px 0;"><strong>Service :</strong> ${appointment.service_type}</p>
+              </div>
+              <p>En cas d'empechement, merci de nous contacter au plus vite.</p>
+              <p style="color: #F5A623; font-weight: bold;">Rappel : Un ramonage = verification de toiture offerte !</p>
+              <p>Cordialement,<br/><strong>L.B Ramonage / Fumisterie</strong></p>
+            </div>
+          </div>
+        `
         break
       case "cancelled":
         subject = "Votre rendez-vous L.B Ramonage a ete annule"
-        body = `Bonjour ${clientName},\n\nNous sommes desoles, votre rendez-vous du ${date} a ${time} a ete annule.\n\nN'hesitez pas a reprendre rendez-vous sur notre site ou a nous contacter.\n\nCordialement,\nL.B Ramonage / Fumisterie`
+        htmlBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #CC0000; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 20px;">L.B Ramonage / Fumisterie</h1>
+            </div>
+            <div style="padding: 30px; background: #f9f9f9;">
+              <h2 style="color: #1A1A1A;">Rendez-vous annule</h2>
+              <p>Bonjour <strong>${clientName}</strong>,</p>
+              <p>Nous sommes desoles, votre rendez-vous du <strong>${date}</strong> a <strong>${time}</strong> a ete annule.</p>
+              <p>N'hesitez pas a reprendre rendez-vous sur notre site ou a nous contacter.</p>
+              <p>Cordialement,<br/><strong>L.B Ramonage / Fumisterie</strong></p>
+            </div>
+          </div>
+        `
         break
       case "reminder":
         subject = "Rappel : votre rendez-vous L.B Ramonage demain"
-        body = `Bonjour ${clientName},\n\nCeci est un rappel pour votre rendez-vous de ramonage prevu demain, ${date} a ${time}.\n\nAdresse d'intervention : ${appointment.address}, ${appointment.city}\n\nA demain !\n\nCordialement,\nL.B Ramonage / Fumisterie`
+        htmlBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #CC0000; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 20px;">L.B Ramonage / Fumisterie</h1>
+            </div>
+            <div style="padding: 30px; background: #f9f9f9;">
+              <h2 style="color: #1A1A1A;">Rappel de votre rendez-vous</h2>
+              <p>Bonjour <strong>${clientName}</strong>,</p>
+              <p>Ceci est un rappel pour votre rendez-vous de ramonage prevu <strong>demain</strong> :</p>
+              <div style="background: white; border-left: 4px solid #F5A623; padding: 15px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>Date :</strong> ${date}</p>
+                <p style="margin: 5px 0;"><strong>Heure :</strong> ${time}</p>
+                <p style="margin: 5px 0;"><strong>Adresse :</strong> ${appointment.address}, ${appointment.city}</p>
+              </div>
+              <p>A demain !</p>
+              <p>Cordialement,<br/><strong>L.B Ramonage / Fumisterie</strong></p>
+            </div>
+          </div>
+        `
+        break
+      case "new_booking_admin":
+        subject = `[Nouveau RDV] ${clientName} - ${date} a ${time}`
+        htmlBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #F5A623; padding: 20px; text-align: center;">
+              <h1 style="color: #1A1A1A; margin: 0; font-size: 20px;">Nouveau rendez-vous</h1>
+            </div>
+            <div style="padding: 30px; background: #f9f9f9;">
+              <h2 style="color: #1A1A1A;">Un client vient de reserver</h2>
+              <div style="background: white; border-left: 4px solid #F5A623; padding: 15px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>Client :</strong> ${clientName}</p>
+                <p style="margin: 5px 0;"><strong>Telephone :</strong> ${appointment.phone}</p>
+                <p style="margin: 5px 0;"><strong>Email :</strong> ${clientEmail || "Non renseigne"}</p>
+                <p style="margin: 5px 0;"><strong>Date :</strong> ${date}</p>
+                <p style="margin: 5px 0;"><strong>Heure :</strong> ${time}</p>
+                <p style="margin: 5px 0;"><strong>Adresse :</strong> ${appointment.address}, ${appointment.city}</p>
+                <p style="margin: 5px 0;"><strong>Service :</strong> ${appointment.service_type}</p>
+                ${appointment.message ? `<p style="margin: 5px 0;"><strong>Message :</strong> ${appointment.message}</p>` : ""}
+              </div>
+              <p>Connectez-vous a l'espace admin pour confirmer ou annuler ce rendez-vous.</p>
+            </div>
+          </div>
+        `
         break
       default:
         return NextResponse.json(
@@ -63,45 +142,58 @@ export async function POST(request: NextRequest) {
         )
     }
 
-    // ============================================================
-    // POUR ACTIVER LES EMAILS REELS :
-    // 1. Creer un compte sur https://resend.com (gratuit)
-    // 2. Ajouter la variable RESEND_API_KEY dans .env.local
-    // 3. pnpm add resend
-    // 4. Decommenter le code ci-dessous :
-    // ============================================================
-    //
-    // import { Resend } from 'resend'
-    // const resend = new Resend(process.env.RESEND_API_KEY)
-    //
-    // if (clientEmail) {
-    //   await resend.emails.send({
-    //     from: 'L.B Ramonage <noreply@votredomaine.fr>',
-    //     to: clientEmail,
-    //     subject,
-    //     text: body,
-    //   })
-    // }
-    //
-    // // Notify admin too
-    // await resend.emails.send({
-    //   from: 'L.B Ramonage <noreply@votredomaine.fr>',
-    //   to: 'admin@lb-ramonage.fr',
-    //   subject: `[Admin] ${subject}`,
-    //   text: body,
-    // })
+    // Check if RESEND_API_KEY is configured
+    if (!process.env.RESEND_API_KEY) {
+      console.log(`[Notification] RESEND_API_KEY manquante - email non envoye`)
+      console.log(`[Notification] Type: ${type}, To: ${clientEmail}`)
+      return NextResponse.json({
+        success: true,
+        emailSent: false,
+        message: "RESEND_API_KEY non configuree. Ajoutez-la dans .env.local",
+      })
+    }
 
-    console.log(`[Notification] Type: ${type}, To: ${clientEmail}`)
-    console.log(`[Notification] Subject: ${subject}`)
-    console.log(`[Notification] Body: ${body}`)
+    const emailsToSend = []
+
+    // Send to client (if they have an email)
+    if (clientEmail && type !== "new_booking_admin") {
+      emailsToSend.push(
+        resend.emails.send({
+          from: FROM_EMAIL,
+          to: clientEmail,
+          subject,
+          html: htmlBody,
+        })
+      )
+    }
+
+    // Send to admin for new bookings or copy admin on confirmations
+    if (type === "new_booking_admin" || type === "confirmed") {
+      emailsToSend.push(
+        resend.emails.send({
+          from: FROM_EMAIL,
+          to: ADMIN_EMAIL,
+          subject: type === "new_booking_admin" ? subject : `[Admin] ${subject}`,
+          html: htmlBody,
+        })
+      )
+    }
+
+    if (emailsToSend.length > 0) {
+      const results = await Promise.allSettled(emailsToSend)
+      const failures = results.filter((r) => r.status === "rejected")
+      
+      if (failures.length > 0) {
+        console.error("[Notification] Certains emails ont echoue:", failures)
+      }
+
+      console.log(`[Notification] ${results.length - failures.length}/${results.length} emails envoyes`)
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Notification "${type}" preparee pour ${clientName}`,
-      email: clientEmail,
-      // Set to true once Resend is configured
-      emailSent: false,
-      subject,
+      emailSent: true,
+      message: `Notification "${type}" envoyee`,
     })
   } catch (error) {
     console.error("[Notification Error]", error)
