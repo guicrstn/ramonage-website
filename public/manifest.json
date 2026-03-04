@@ -1,0 +1,22 @@
+{
+  "name": "L.B Ramonage - Admin",
+  "short_name": "LB Admin",
+  "description": "Tableau de bord L.B Ramonage / Fumisterie",
+  "start_url": "/protected",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#CC0000",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

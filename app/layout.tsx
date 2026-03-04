@@ -11,6 +11,12 @@ export const metadata: Metadata = {
   title: 'L.B Ramonage / Fumisterie - Ramonage professionnel',
   description: 'L.B Ramonage/Fumisterie : ramonage professionnel, entretien de cheminees et poeles. Un ramonage = verification de toiture offerte. Prenez rendez-vous en ligne.',
   keywords: 'ramonage, fumisterie, entretien cheminee, ramoneur, nettoyage conduit, poele, insert, cheminee',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LB Admin',
+  },
   icons: {
     icon: '/images/logo.png',
     apple: '/images/logo.png',

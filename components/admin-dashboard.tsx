@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -29,6 +29,13 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  Download,
+  Calendar as CalendarIcon,
+  Send,
+  ExternalLink,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -60,10 +67,10 @@ type Message = {
 }
 
 const statusColors: Record<string, string> = {
-  pending: "bg-secondary text-secondary-foreground",
-  confirmed: "bg-chart-3/20 text-chart-3",
-  cancelled: "bg-destructive/20 text-destructive",
-  completed: "bg-primary/20 text-primary",
+  pending: "bg-[#F5A623]/20 text-[#F5A623]",
+  confirmed: "bg-emerald-500/20 text-emerald-600",
+  cancelled: "bg-red-500/20 text-red-600",
+  completed: "bg-[#CC0000]/20 text-[#CC0000]",
 }
 
 const statusLabels: Record<string, string> = {
@@ -81,6 +88,25 @@ const serviceLabels: Record<string, string> = {
   autre: "Autre",
 }
 
+const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+const MONTHS_FR = [
+  "Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Aout", "Septembre", "Octobre", "Novembre", "Decembre",
+]
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate()
+}
+
+function getFirstDayOfMonth(year: number, month: number) {
+  const day = new Date(year, month, 1).getDay()
+  return day === 0 ? 6 : day - 1
+}
+
+function formatDateKey(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
 export function AdminDashboard({
   initialAppointments,
   initialMessages,
@@ -92,7 +118,22 @@ export function AdminDashboard({
 }) {
   const [appointments, setAppointments] = useState(initialAppointments)
   const [messages, setMessages] = useState(initialMessages)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [calMonth, setCalMonth] = useState(new Date().getMonth())
+  const [calYear, setCalYear] = useState(new Date().getFullYear())
   const router = useRouter()
+
+  // Group appointments by date for calendar
+  const appointmentsByDate = useMemo(() => {
+    const map: Record<string, Appointment[]> = {}
+    for (const appt of appointments) {
+      if (appt.status !== "cancelled") {
+        if (!map[appt.preferred_date]) map[appt.preferred_date] = []
+        map[appt.preferred_date].push(appt)
+      }
+    }
+    return map
+  }, [appointments])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -116,17 +157,57 @@ export function AdminDashboard({
       prev.map((a) => (a.id === id ? { ...a, status } : a))
     )
     toast.success(`Rendez-vous ${statusLabels[status]?.toLowerCase() || status}`)
+
+    // Send notification when confirming or cancelling
+    const appt = appointments.find((a) => a.id === id)
+    if (appt && (status === "confirmed" || status === "cancelled")) {
+      sendNotification(status, { ...appt, status })
+    }
+  }
+
+  const sendNotification = async (type: string, appointment: Appointment) => {
+    try {
+      const res = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, appointment }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        if (data.emailSent) {
+          toast.success(`Email envoye a ${appointment.email || "l'admin"}`)
+        } else {
+          toast.info(`Notification preparee (configurez Resend pour envoyer les emails)`)
+        }
+      }
+    } catch {
+      // Silently fail notification - don't block the status update
+    }
+  }
+
+  const sendReminder = async (appointment: Appointment) => {
+    try {
+      const res = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "reminder", appointment }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`Rappel envoye pour ${appointment.full_name}`)
+      }
+    } catch {
+      toast.error("Erreur lors de l'envoi du rappel")
+    }
   }
 
   const deleteAppointment = async (id: string) => {
     const supabase = createClient()
     const { error } = await supabase.from("appointments").delete().eq("id", id)
-
     if (error) {
       toast.error("Erreur lors de la suppression")
       return
     }
-
     setAppointments((prev) => prev.filter((a) => a.id !== id))
     toast.success("Rendez-vous supprime")
   }
@@ -137,12 +218,10 @@ export function AdminDashboard({
       .from("contact_messages")
       .update({ is_read: !currentRead })
       .eq("id", id)
-
     if (error) {
       toast.error("Erreur lors de la mise a jour")
       return
     }
-
     setMessages((prev) =>
       prev.map((m) => (m.id === id ? { ...m, is_read: !currentRead } : m))
     )
@@ -151,23 +230,62 @@ export function AdminDashboard({
   const deleteMessage = async (id: string) => {
     const supabase = createClient()
     const { error } = await supabase.from("contact_messages").delete().eq("id", id)
-
     if (error) {
       toast.error("Erreur lors de la suppression")
       return
     }
-
     setMessages((prev) => prev.filter((m) => m.id !== id))
     toast.success("Message supprime")
   }
 
   const pendingCount = appointments.filter((a) => a.status === "pending").length
   const unreadCount = messages.filter((m) => !m.is_read).length
+  const confirmedCount = appointments.filter((a) => a.status === "confirmed").length
+
+  // Calendar helpers
+  const daysInMonth = getDaysInMonth(calYear, calMonth)
+  const firstDay = getFirstDayOfMonth(calYear, calMonth)
+  const todayStr = formatDateKey(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    new Date().getDate()
+  )
+
+  const prevMonth = () => {
+    if (calMonth === 0) {
+      setCalMonth(11)
+      setCalYear(calYear - 1)
+    } else {
+      setCalMonth(calMonth - 1)
+    }
+  }
+
+  const nextMonth = () => {
+    if (calMonth === 11) {
+      setCalMonth(0)
+      setCalYear(calYear + 1)
+    } else {
+      setCalMonth(calMonth + 1)
+    }
+  }
+
+  // Get selected day appointments
+  const selectedDayAppointments = selectedDate
+    ? appointments.filter(
+        (a) => a.preferred_date === selectedDate && a.status !== "cancelled"
+      )
+    : []
+
+  // Calendar URL for Google Calendar / iPhone
+  const calendarUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/api/calendar`
+    : "/api/calendar"
+  const googleCalSyncUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarUrl.replace("https://", "webcal://").replace("http://", "webcal://"))}`
 
   return (
-    <div className="min-h-svh bg-muted">
+    <div className="min-h-svh bg-[#F5F3EF]">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-[#E8E4DC] bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
             <Image
@@ -178,120 +296,355 @@ export function AdminDashboard({
               className="h-10 w-auto"
             />
             <div>
-              <p className="font-serif text-sm font-bold text-foreground">Administration</p>
-              <p className="text-xs text-muted-foreground">{userEmail}</p>
+              <p className="font-serif text-sm font-bold text-[#1A1A1A]">Administration</p>
+              <p className="text-xs text-[#6B6B6B]">{userEmail}</p>
             </div>
           </Link>
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-            className="border-border text-muted-foreground"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Deconnexion
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* ICS Download */}
+            <a
+              href="/api/calendar"
+              download="lb-ramonage-rdv.ics"
+              className="hidden sm:inline-flex"
+            >
+              <Button variant="outline" size="sm" className="border-[#E8E4DC] text-[#6B6B6B]">
+                <Download className="mr-2 h-4 w-4" />
+                Exporter ICS
+              </Button>
+            </a>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="border-[#E8E4DC] text-[#6B6B6B]"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Deconnexion</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
         {/* Stats */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-border bg-card">
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <CalendarDays className="h-5 w-5 text-primary" />
+        <div className="mb-6 grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card className="border-[#E8E4DC] bg-white">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#CC0000]/10">
+                <CalendarDays className="h-5 w-5 text-[#CC0000]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-card-foreground">{appointments.length}</p>
-                <p className="text-xs text-muted-foreground">Total RDV</p>
+                <p className="text-2xl font-bold text-[#1A1A1A]">{appointments.length}</p>
+                <p className="text-xs text-[#6B6B6B]">Total RDV</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card">
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/20">
-                <AlertCircle className="h-5 w-5 text-secondary" />
+          <Card className="border-[#E8E4DC] bg-white">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F5A623]/10">
+                <AlertCircle className="h-5 w-5 text-[#F5A623]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-card-foreground">{pendingCount}</p>
-                <p className="text-xs text-muted-foreground">En attente</p>
+                <p className="text-2xl font-bold text-[#1A1A1A]">{pendingCount}</p>
+                <p className="text-xs text-[#6B6B6B]">En attente</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card">
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-3/10">
-                <CheckCircle2 className="h-5 w-5 text-chart-3" />
+          <Card className="border-[#E8E4DC] bg-white">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {appointments.filter((a) => a.status === "confirmed").length}
-                </p>
-                <p className="text-xs text-muted-foreground">Confirmes</p>
+                <p className="text-2xl font-bold text-[#1A1A1A]">{confirmedCount}</p>
+                <p className="text-xs text-[#6B6B6B]">Confirmes</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card">
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Mail className="h-5 w-5 text-primary" />
+          <Card className="border-[#E8E4DC] bg-white">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#CC0000]/10">
+                <Mail className="h-5 w-5 text-[#CC0000]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-card-foreground">{unreadCount}</p>
-                <p className="text-xs text-muted-foreground">Messages non lus</p>
+                <p className="text-2xl font-bold text-[#1A1A1A]">{unreadCount}</p>
+                <p className="text-xs text-[#6B6B6B]">Messages non lus</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="appointments">
-          <TabsList className="mb-6 bg-card">
-            <TabsTrigger value="appointments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Rendez-vous
+        {/* Calendar Sync Info */}
+        <Card className="mb-6 border-[#F5A623]/30 bg-[#FFF8EC]">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <CalendarIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#F5A623]" />
+              <div>
+                <p className="text-sm font-semibold text-[#1A1A1A]">Synchroniser vos RDV confirmes</p>
+                <p className="text-xs text-[#6B6B6B]">
+                  Ajoutez les RDV confirmes a votre Google Calendar ou Calendrier iPhone.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={calendarUrl.replace("https://", "webcal://").replace("http://", "webcal://")} className="inline-flex">
+                <Button size="sm" variant="outline" className="border-[#E8E4DC] text-sm">
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  iPhone / Mac
+                </Button>
+              </a>
+              <a href={googleCalSyncUrl} target="_blank" rel="noopener noreferrer" className="inline-flex">
+                <Button size="sm" variant="outline" className="border-[#E8E4DC] text-sm">
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  Google Calendar
+                </Button>
+              </a>
+              <a href="/api/calendar" download="lb-ramonage-rdv.ics" className="inline-flex sm:hidden">
+                <Button size="sm" variant="outline" className="border-[#E8E4DC] text-sm">
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  Telecharger .ics
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Content */}
+        <Tabs defaultValue="calendar">
+          <TabsList className="mb-6 bg-white">
+            <TabsTrigger value="calendar" className="data-[state=active]:bg-[#CC0000] data-[state=active]:text-white">
+              Calendrier
+            </TabsTrigger>
+            <TabsTrigger value="appointments" className="data-[state=active]:bg-[#CC0000] data-[state=active]:text-white">
+              Tous les RDV
               {pendingCount > 0 && (
-                <Badge className="ml-2 bg-secondary text-secondary-foreground text-xs">
-                  {pendingCount}
-                </Badge>
+                <Badge className="ml-2 bg-[#F5A623] text-[#1A1A1A] text-xs">{pendingCount}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="messages" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="messages" className="data-[state=active]:bg-[#CC0000] data-[state=active]:text-white">
               Messages
               {unreadCount > 0 && (
-                <Badge className="ml-2 bg-secondary text-secondary-foreground text-xs">
-                  {unreadCount}
-                </Badge>
+                <Badge className="ml-2 bg-[#F5A623] text-[#1A1A1A] text-xs">{unreadCount}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
 
-          {/* Appointments Tab */}
+          {/* ===================== CALENDAR TAB ===================== */}
+          <TabsContent value="calendar">
+            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+              {/* Calendar Grid */}
+              <Card className="border-[#E8E4DC] bg-white">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <Button variant="ghost" size="icon" onClick={prevMonth}>
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <CardTitle className="font-serif text-lg font-bold text-[#1A1A1A]">
+                    {MONTHS_FR[calMonth]} {calYear}
+                  </CardTitle>
+                  <Button variant="ghost" size="icon" onClick={nextMonth}>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="px-3 pb-4">
+                  {/* Day headers */}
+                  <div className="mb-2 grid grid-cols-7 text-center">
+                    {DAYS_FR.map((d) => (
+                      <span key={d} className="py-2 text-xs font-semibold text-[#6B6B6B]">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                  {/* Calendar days */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Empty cells for first week offset */}
+                    {Array.from({ length: firstDay }, (_, i) => (
+                      <div key={`empty-${i}`} className="aspect-square" />
+                    ))}
+                    {Array.from({ length: daysInMonth }, (_, i) => {
+                      const day = i + 1
+                      const dateKey = formatDateKey(calYear, calMonth, day)
+                      const dayAppts = appointmentsByDate[dateKey] || []
+                      const isToday = dateKey === todayStr
+                      const isSelected = dateKey === selectedDate
+                      const hasPending = dayAppts.some((a) => a.status === "pending")
+                      const hasConfirmed = dayAppts.some((a) => a.status === "confirmed")
+
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => setSelectedDate(dateKey)}
+                          className={`relative flex aspect-square flex-col items-center justify-center rounded-lg text-sm transition-all ${
+                            isSelected
+                              ? "bg-[#CC0000] font-bold text-white shadow-md"
+                              : isToday
+                                ? "bg-[#CC0000]/10 font-semibold text-[#CC0000] ring-1 ring-[#CC0000]/30"
+                                : "text-[#1A1A1A] hover:bg-[#F5F3EF]"
+                          }`}
+                        >
+                          <span>{day}</span>
+                          {dayAppts.length > 0 && (
+                            <div className="mt-0.5 flex gap-0.5">
+                              {hasPending && (
+                                <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-[#F5A623]" : "bg-[#F5A623]"}`} />
+                              )}
+                              {hasConfirmed && (
+                                <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-emerald-300" : "bg-emerald-500"}`} />
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {/* Legend */}
+                  <div className="mt-4 flex flex-wrap gap-4 border-t border-[#E8E4DC] pt-3 text-xs text-[#6B6B6B]">
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#F5A623]" />
+                      En attente
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      Confirme
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Selected Day Details */}
+              <div className="flex flex-col gap-4">
+                {selectedDate ? (
+                  <>
+                    <h3 className="font-serif text-lg font-bold text-[#1A1A1A]">
+                      {new Date(selectedDate + "T12:00:00").toLocaleDateString("fr-FR", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}
+                    </h3>
+                    {selectedDayAppointments.length === 0 ? (
+                      <Card className="border-[#E8E4DC] bg-white">
+                        <CardContent className="flex flex-col items-center gap-2 p-8 text-center">
+                          <CalendarDays className="h-10 w-10 text-[#E8E4DC]" />
+                          <p className="text-sm text-[#6B6B6B]">Aucun RDV ce jour</p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      selectedDayAppointments
+                        .sort((a, b) => a.preferred_time.localeCompare(b.preferred_time))
+                        .map((appt) => (
+                          <Card key={appt.id} className="border-[#E8E4DC] bg-white">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded bg-[#CC0000]/10 px-2 py-0.5 text-xs font-bold text-[#CC0000]">
+                                      {appt.preferred_time}
+                                    </span>
+                                    <Badge className={statusColors[appt.status]}>
+                                      {statusLabels[appt.status]}
+                                    </Badge>
+                                  </div>
+                                  <p className="mt-2 font-semibold text-[#1A1A1A]">{appt.full_name}</p>
+                                  <div className="mt-1 flex flex-col gap-1 text-xs text-[#6B6B6B]">
+                                    <span className="flex items-center gap-1.5">
+                                      <Phone className="h-3 w-3" />
+                                      <a href={`tel:${appt.phone}`} className="text-[#CC0000]">
+                                        {appt.phone}
+                                      </a>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                      <MapPin className="h-3 w-3" />
+                                      <span className="truncate">{appt.address}, {appt.city}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                      <CalendarDays className="h-3 w-3" />
+                                      {serviceLabels[appt.service_type] || appt.service_type}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Actions row */}
+                              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#E8E4DC] pt-3">
+                                <Select
+                                  value={appt.status}
+                                  onValueChange={(val) => updateAppointmentStatus(appt.id, val)}
+                                >
+                                  <SelectTrigger className="h-8 w-28 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pending">En attente</SelectItem>
+                                    <SelectItem value="confirmed">Confirme</SelectItem>
+                                    <SelectItem value="completed">Termine</SelectItem>
+                                    <SelectItem value="cancelled">Annule</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {appt.status === "confirmed" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 border-[#F5A623]/30 text-xs text-[#F5A623] hover:bg-[#F5A623]/10"
+                                    onClick={() => sendReminder(appt)}
+                                  >
+                                    <Bell className="mr-1 h-3 w-3" />
+                                    Rappel
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="ml-auto h-8 w-8 shrink-0 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                  onClick={() => deleteAppointment(appt.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                    )}
+                  </>
+                ) : (
+                  <Card className="border-[#E8E4DC] bg-white">
+                    <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+                      <CalendarDays className="h-12 w-12 text-[#E8E4DC]" />
+                      <p className="text-sm text-[#6B6B6B]">
+                        Cliquez sur un jour du calendrier pour voir les RDV.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ===================== ALL APPOINTMENTS TAB ===================== */}
           <TabsContent value="appointments">
             {appointments.length === 0 ? (
-              <Card className="border-border bg-card">
+              <Card className="border-[#E8E4DC] bg-white">
                 <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-                  <CalendarDays className="h-12 w-12 text-muted-foreground/40" />
-                  <p className="text-muted-foreground">Aucun rendez-vous pour le moment.</p>
+                  <CalendarDays className="h-12 w-12 text-[#E8E4DC]" />
+                  <p className="text-[#6B6B6B]">Aucun rendez-vous pour le moment.</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="flex flex-col gap-4">
                 {appointments.map((appt) => (
-                  <Card key={appt.id} className="border-border bg-card">
+                  <Card key={appt.id} className="border-[#E8E4DC] bg-white">
                     <CardContent className="p-5">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-card-foreground">{appt.full_name}</h3>
-                            <Badge className={statusColors[appt.status] || "bg-muted text-muted-foreground"}>
+                            <h3 className="font-semibold text-[#1A1A1A]">{appt.full_name}</h3>
+                            <Badge className={statusColors[appt.status] || "bg-gray-100 text-gray-600"}>
                               {statusLabels[appt.status] || appt.status}
                             </Badge>
-                            <Badge variant="outline" className="border-border text-muted-foreground">
+                            <Badge variant="outline" className="border-[#E8E4DC] text-[#6B6B6B]">
                               {serviceLabels[appt.service_type] || appt.service_type}
                             </Badge>
                           </div>
-                          <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                          <div className="mt-3 grid gap-2 text-sm text-[#6B6B6B] sm:grid-cols-2">
                             <div className="flex items-center gap-2">
                               <CalendarDays className="h-3.5 w-3.5" />
                               {new Date(appt.preferred_date).toLocaleDateString("fr-FR", {
@@ -307,7 +660,7 @@ export function AdminDashboard({
                             </div>
                             <div className="flex items-center gap-2">
                               <Phone className="h-3.5 w-3.5" />
-                              <a href={`tel:${appt.phone}`} className="text-primary hover:underline">
+                              <a href={`tel:${appt.phone}`} className="text-[#CC0000] hover:underline">
                                 {appt.phone}
                               </a>
                             </div>
@@ -323,14 +676,22 @@ export function AdminDashboard({
                             )}
                           </div>
                           {appt.message && (
-                            <p className="mt-2 rounded bg-muted p-2 text-sm text-muted-foreground">
-                              {appt.message}
-                            </p>
+                            <p className="mt-2 rounded bg-[#F5F3EF] p-2 text-sm text-[#6B6B6B]">{appt.message}</p>
                           )}
                         </div>
-
-                        {/* Actions */}
                         <div className="flex items-center gap-2">
+                          {appt.status === "confirmed" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#F5A623]/30 text-[#F5A623] hover:bg-[#F5A623]/10"
+                              onClick={() => sendReminder(appt)}
+                              title="Envoyer un rappel au client"
+                            >
+                              <Bell className="mr-1.5 h-3.5 w-3.5" />
+                              Rappel
+                            </Button>
+                          )}
                           <Select
                             value={appt.status}
                             onValueChange={(val) => updateAppointmentStatus(appt.id, val)}
@@ -348,7 +709,7 @@ export function AdminDashboard({
                           <Button
                             variant="outline"
                             size="icon"
-                            className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            className="shrink-0 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
                             onClick={() => deleteAppointment(appt.id)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -362,13 +723,13 @@ export function AdminDashboard({
             )}
           </TabsContent>
 
-          {/* Messages Tab */}
+          {/* ===================== MESSAGES TAB ===================== */}
           <TabsContent value="messages">
             {messages.length === 0 ? (
-              <Card className="border-border bg-card">
+              <Card className="border-[#E8E4DC] bg-white">
                 <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-                  <Mail className="h-12 w-12 text-muted-foreground/40" />
-                  <p className="text-muted-foreground">Aucun message pour le moment.</p>
+                  <Mail className="h-12 w-12 text-[#E8E4DC]" />
+                  <p className="text-[#6B6B6B]">Aucun message pour le moment.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -376,20 +737,20 @@ export function AdminDashboard({
                 {messages.map((msg) => (
                   <Card
                     key={msg.id}
-                    className={`border-border bg-card ${!msg.is_read ? "border-l-4 border-l-primary" : ""}`}
+                    className={`border-[#E8E4DC] bg-white ${!msg.is_read ? "border-l-4 border-l-[#CC0000]" : ""}`}
                   >
                     <CardContent className="p-5">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {msg.is_read ? (
-                              <MailOpen className="h-4 w-4 text-muted-foreground" />
+                              <MailOpen className="h-4 w-4 text-[#6B6B6B]" />
                             ) : (
-                              <Mail className="h-4 w-4 text-primary" />
+                              <Mail className="h-4 w-4 text-[#CC0000]" />
                             )}
-                            <h3 className="font-semibold text-card-foreground">{msg.subject}</h3>
+                            <h3 className="font-semibold text-[#1A1A1A]">{msg.subject}</h3>
                           </div>
-                          <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                          <div className="mt-2 flex flex-wrap gap-3 text-sm text-[#6B6B6B]">
                             <span className="flex items-center gap-1">
                               <User className="h-3.5 w-3.5" />
                               {msg.full_name}
@@ -415,17 +776,14 @@ export function AdminDashboard({
                               })}
                             </span>
                           </div>
-                          <p className="mt-2 rounded bg-muted p-3 text-sm text-muted-foreground">
-                            {msg.message}
-                          </p>
+                          <p className="mt-2 rounded bg-[#F5F3EF] p-3 text-sm text-[#6B6B6B]">{msg.message}</p>
                         </div>
-
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => toggleMessageRead(msg.id, msg.is_read)}
-                            className="border-border text-muted-foreground"
+                            className="border-[#E8E4DC] text-[#6B6B6B]"
                           >
                             {msg.is_read ? (
                               <>
@@ -442,7 +800,7 @@ export function AdminDashboard({
                           <Button
                             variant="outline"
                             size="icon"
-                            className="shrink-0 border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            className="shrink-0 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
                             onClick={() => deleteMessage(msg.id)}
                           >
                             <Trash2 className="h-4 w-4" />
