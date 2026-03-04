@@ -22,12 +22,15 @@ import {
   ChevronRight,
   Clock,
   User,
+  AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
+import { AddressAutocomplete, type AddressResult } from "@/components/address-autocomplete"
 
+// 30-minute slots from 8:00 to 17:30, break at 12:00-13:00
 const timeSlots = [
-  "08:00", "09:00", "10:00", "11:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00",
+  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
 ]
 
 const serviceTypes = [
@@ -69,6 +72,8 @@ export function BookingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [step, setStep] = useState<"calendar" | "form">("calendar")
+  const [distanceError, setDistanceError] = useState<string | null>(null)
+  const [isCheckingDistance, setIsCheckingDistance] = useState(false)
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -78,6 +83,8 @@ export function BookingForm() {
     postal_code: "",
     service_type: "",
     message: "",
+    latitude: 0,
+    longitude: 0,
   })
 
   const fetchBookedSlots = useCallback(async () => {
@@ -105,6 +112,14 @@ export function BookingForm() {
 
   useEffect(() => {
     fetchBookedSlots()
+  }, [fetchBookedSlots])
+
+  // Auto-refresh every 30 seconds to catch other bookings
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchBookedSlots()
+    }, 30000)
+    return () => clearInterval(interval)
   }, [fetchBookedSlots])
 
   const isSlotBooked = (date: string, time: string) => {
@@ -144,6 +159,7 @@ export function BookingForm() {
     if (available.length === 0) return
     setSelectedDate(dateStr)
     setSelectedTime(null)
+    setDistanceError(null)
   }
 
   const handleTimeClick = (time: string) => {
@@ -154,9 +170,57 @@ export function BookingForm() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
+  const handleAddressSelect = async (address: AddressResult) => {
+    setForm((prev) => ({
+      ...prev,
+      address: address.street,
+      city: address.city,
+      postal_code: address.postcode,
+      latitude: address.latitude,
+      longitude: address.longitude,
+    }))
+    setDistanceError(null)
+
+    // Check distance if a date is selected
+    if (selectedDate && address.latitude && address.longitude) {
+      setIsCheckingDistance(true)
+      try {
+        const res = await fetch("/api/check-distance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: selectedDate,
+            latitude: address.latitude,
+            longitude: address.longitude,
+          }),
+        })
+        const data = await res.json()
+        if (!data.allowed) {
+          setDistanceError(data.message)
+        }
+      } catch {
+        // Don't block on error
+      } finally {
+        setIsCheckingDistance(false)
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedDate || !selectedTime) return
+
+    // Validate address has been selected via autocomplete
+    if (!form.latitude || !form.longitude) {
+      toast.error("Veuillez selectionner une adresse dans la liste de suggestions.")
+      return
+    }
+
+    if (distanceError) {
+      toast.error("Votre adresse est en dehors du rayon d'intervention pour cette date.")
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -179,6 +243,24 @@ export function BookingForm() {
         return
       }
 
+      // Final distance check server-side
+      const distCheck = await fetch("/api/check-distance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDate,
+          latitude: form.latitude,
+          longitude: form.longitude,
+        }),
+      })
+      const distData = await distCheck.json()
+      if (!distData.allowed) {
+        toast.error(distData.message)
+        setDistanceError(distData.message)
+        setIsSubmitting(false)
+        return
+      }
+
       const { error } = await supabase.from("appointments").insert({
         full_name: form.full_name,
         email: form.email || null,
@@ -190,6 +272,8 @@ export function BookingForm() {
         preferred_date: selectedDate,
         preferred_time: selectedTime,
         message: form.message || null,
+        latitude: form.latitude,
+        longitude: form.longitude,
       })
 
       if (error) throw error
@@ -240,9 +324,11 @@ export function BookingForm() {
               setStep("calendar")
               setSelectedDate(null)
               setSelectedTime(null)
+              setDistanceError(null)
               setForm({
                 full_name: "", email: "", phone: "", address: "",
                 city: "", postal_code: "", service_type: "", message: "",
+                latitude: 0, longitude: 0,
               })
               fetchBookedSlots()
             }}
@@ -299,9 +385,13 @@ export function BookingForm() {
                   <CalendarDays className="h-5 w-5 text-[#CC0000]" />
                   Planning des disponibilites
                 </CardTitle>
+                <span className="flex items-center gap-1.5 rounded-full bg-[#2E7D32]/10 px-3 py-1 text-xs font-semibold text-[#2E7D32]">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#2E7D32]" />
+                  Temps reel
+                </span>
               </div>
               <CardDescription>
-                Selectionnez une date puis un creneau horaire disponible. Les creneaux deja reserves sont grises.
+                Creneaux de 30 minutes. Les creneaux reserves par d{"'"}autres clients sont automatiquement indisponibles.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -388,7 +478,7 @@ export function BookingForm() {
                                 ? "text-white/80"
                                 : isFull
                                   ? "text-muted-foreground/40"
-                                  : availableCount <= 3
+                                  : availableCount <= 4
                                     ? "text-[#F5A623]"
                                     : "text-[#2E7D32]"
                             }`}
@@ -413,7 +503,7 @@ export function BookingForm() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded-full bg-[#F5A623]" />
-                  <span className="text-xs text-muted-foreground">{"Peu de places (< 4)"}</span>
+                  <span className="text-xs text-muted-foreground">{"Peu de places"}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-3 rounded-full bg-muted-foreground/30" />
@@ -437,32 +527,62 @@ export function BookingForm() {
                   })}
                 </CardTitle>
                 <CardDescription>
-                  Choisissez un creneau libre. Les creneaux reserves sont indisponibles.
+                  Creneaux de 30 minutes. Les creneaux gris sont deja pris par d{"'"}autres clients.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-                  {timeSlots.map((time) => {
+                {/* Morning slots */}
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Matin</p>
+                <div className="mb-4 grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-8">
+                  {timeSlots.filter(t => parseInt(t) < 12).map((time) => {
                     const booked = isSlotBooked(selectedDate, time)
-                    const isSelected = selectedTime === time
+                    const selected = selectedTime === time
 
                     return (
                       <button
                         key={time}
                         onClick={() => !booked && handleTimeClick(time)}
                         disabled={booked}
-                        className={`flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all ${
-                          isSelected
+                        className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2.5 text-sm font-semibold transition-all ${
+                          selected
                             ? "border-[#CC0000] bg-[#CC0000] text-white shadow-lg"
                             : booked
                               ? "cursor-not-allowed border-border bg-muted/50 text-muted-foreground/40 line-through"
                               : "border-border bg-card text-card-foreground hover:border-[#CC0000] hover:bg-[#CC0000]/5"
                         }`}
                       >
-                        <Clock className={`h-4 w-4 ${isSelected ? "text-white" : booked ? "text-muted-foreground/30" : "text-[#F5A623]"}`} />
                         {time}
-                        <span className={`text-[10px] font-normal ${isSelected ? "text-white/80" : booked ? "text-muted-foreground/30" : "text-[#2E7D32]"}`}>
-                          {booked ? "Reserve" : "Libre"}
+                        <span className={`text-[9px] font-normal ${selected ? "text-white/80" : booked ? "text-muted-foreground/30" : "text-[#2E7D32]"}`}>
+                          {booked ? "Pris" : "Libre"}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Afternoon slots */}
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Apres-midi</p>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-8">
+                  {timeSlots.filter(t => parseInt(t) >= 13).map((time) => {
+                    const booked = isSlotBooked(selectedDate, time)
+                    const selected = selectedTime === time
+
+                    return (
+                      <button
+                        key={time}
+                        onClick={() => !booked && handleTimeClick(time)}
+                        disabled={booked}
+                        className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2.5 text-sm font-semibold transition-all ${
+                          selected
+                            ? "border-[#CC0000] bg-[#CC0000] text-white shadow-lg"
+                            : booked
+                              ? "cursor-not-allowed border-border bg-muted/50 text-muted-foreground/40 line-through"
+                              : "border-border bg-card text-card-foreground hover:border-[#CC0000] hover:bg-[#CC0000]/5"
+                        }`}
+                      >
+                        {time}
+                        <span className={`text-[9px] font-normal ${selected ? "text-white/80" : booked ? "text-muted-foreground/30" : "text-[#2E7D32]"}`}>
+                          {booked ? "Pris" : "Libre"}
                         </span>
                       </button>
                     )
@@ -473,7 +593,7 @@ export function BookingForm() {
                   <div className="mt-5 flex justify-end">
                     <Button
                       onClick={() => setStep("form")}
-                      className="bg-[#CC0000] px-6 font-semibold text-white hover:bg-[#CC0000]/90"
+                      className="bg-[#CC0000] px-6 font-semibold text-white hover:bg-[#B30000]"
                       size="lg"
                     >
                       Continuer
@@ -562,40 +682,34 @@ export function BookingForm() {
                 />
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="address">Adresse *</Label>
-                  <Input
-                    id="address"
-                    name="address"
-                    value={form.address}
-                    onChange={handleChange}
-                    placeholder="12 rue de la Paix"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="city">Ville *</Label>
-                  <Input
-                    id="city"
-                    name="city"
-                    value={form.city}
-                    onChange={handleChange}
-                    placeholder="Paris"
-                    required
-                  />
-                </div>
-              </div>
-
+              {/* Address autocomplete */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="postal_code">Code postal</Label>
-                <Input
-                  id="postal_code"
-                  name="postal_code"
-                  value={form.postal_code}
-                  onChange={handleChange}
-                  placeholder="75000"
+                <Label>Adresse d{"'"}intervention *</Label>
+                <AddressAutocomplete
+                  value={form.address}
+                  onChange={handleAddressSelect}
+                  placeholder="Tapez votre adresse..."
                 />
+                {form.city && (
+                  <p className="text-xs text-muted-foreground">
+                    {form.address}, {form.postal_code} {form.city}
+                  </p>
+                )}
+                {isCheckingDistance && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Verification du secteur d{"'"}intervention...
+                  </div>
+                )}
+                {distanceError && (
+                  <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Hors secteur d{"'"}intervention</p>
+                      <p className="text-xs">{distanceError}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -643,8 +757,8 @@ export function BookingForm() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-[#CC0000] text-white hover:bg-[#CC0000]/90"
+                  disabled={isSubmitting || !!distanceError || isCheckingDistance}
+                  className="flex-1 bg-[#CC0000] font-bold text-white hover:bg-[#B30000] disabled:opacity-50"
                   size="lg"
                 >
                   {isSubmitting ? (
