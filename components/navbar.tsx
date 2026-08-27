@@ -48,9 +48,9 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a href="tel:+33600000000" className="flex items-center gap-2 text-sm font-bold text-[#CC0000]">
+          <a href="tel:+33651436495" className="flex items-center gap-2 text-sm font-bold text-[#CC0000]">
             <Phone className="h-4 w-4" />
-            <span>06 00 00 00 00</span>
+            <span>06 51 43 64 95</span>
           </a>
           <Button asChild className="bg-[#CC0000] font-bold text-white hover:bg-[#B30000]">
             <Link href="/rendez-vous">Prendre RDV</Link>
@@ -82,11 +82,11 @@ export function Navbar() {
               </Link>
             ))}
             <a
-              href="tel:+33600000000"
+              href="tel:+33651436495"
               className="flex items-center gap-2 py-3 text-sm font-bold text-[#CC0000]"
             >
               <Phone className="h-4 w-4" />
-              06 00 00 00 00
+              06 51 43 64 95
             </a>
             <Button asChild className="mt-2 bg-[#CC0000] font-bold text-white hover:bg-[#B30000]">
               <Link href="/rendez-vous" onClick={() => setIsOpen(false)}>

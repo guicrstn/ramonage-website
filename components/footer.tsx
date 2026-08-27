@@ -59,15 +59,15 @@ export function Footer() {
             <ul className="flex flex-col gap-3">
               <li className="flex items-center gap-2 text-sm text-white/70">
                 <Phone className="h-4 w-4 shrink-0 text-[#F5A623]" />
-                06 00 00 00 00
+                06 51 43 64 95
               </li>
               <li className="flex items-center gap-2 text-sm text-white/70">
                 <Mail className="h-4 w-4 shrink-0 text-[#F5A623]" />
-                contact@lb-ramonage.fr
+                contact@lbramonage.fr
               </li>
               <li className="flex items-start gap-2 text-sm text-white/70">
                 <MapPin className="h-4 w-4 shrink-0 text-[#F5A623]" />
-                Zone d{"'"}intervention: votre region
+                Dortan (01590) et alentours
               </li>
             </ul>
           </div>
