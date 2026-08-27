@@ -13,7 +13,7 @@ const prestations = [
 
 export function Flyer() {
   return (
-    <div className="min-h-screen bg-[#F5F3EF] py-8">
+    <div className="print-page min-h-screen bg-[#F5F3EF] py-8">
       {/* Barre d'actions - masquee a l'impression */}
       <div className="no-print mx-auto mb-8 flex max-w-[210mm] flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -33,11 +33,11 @@ export function Flyer() {
       </div>
 
       {/* Zone scrollable sur mobile */}
-      <div className="overflow-x-auto px-4 pb-4">
+      <div className="print-scroll overflow-x-auto px-4 pb-4">
         {/* FEUILLE A4 */}
         <div
-          className="print-sheet mx-auto flex flex-col bg-white shadow-2xl"
-          style={{ width: "210mm", minHeight: "297mm" }}
+          className="print-sheet mx-auto flex flex-col overflow-hidden bg-white shadow-2xl"
+          style={{ width: "210mm", height: "297mm" }}
         >
           {/* ---------- EN-TETE ---------- */}
           <header className="flex items-center justify-between gap-6 bg-[#1A1A1A] px-10 py-6">
@@ -120,7 +120,7 @@ export function Flyer() {
 
             {/* Colonne visuel */}
             <div className="flex w-[78mm] shrink-0 flex-col">
-              <div className="relative mb-4 min-h-[92mm] w-full flex-1 overflow-hidden rounded-xl">
+              <div className="relative mb-4 w-full flex-1 overflow-hidden rounded-xl">
                 <Image
                   src="/images/hero-chimney.jpg"
                   alt="Ramoneur professionnel en intervention sur une toiture"
@@ -207,14 +207,33 @@ export function Flyer() {
           }
           html,
           body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff !important;
+            overflow: hidden !important;
           }
           .no-print {
             display: none !important;
           }
           .print-sheet {
+            width: 210mm !important;
+            height: 297mm !important;
             box-shadow: none !important;
             margin: 0 !important;
+            overflow: hidden !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .print-page,
+          .print-scroll {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            min-height: 0 !important;
           }
           * {
             -webkit-print-color-adjust: exact !important;
