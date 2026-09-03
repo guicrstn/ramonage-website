@@ -61,10 +61,16 @@ function getFirstDayOfMonth(year: number, month: number) {
   return day === 0 ? 6 : day - 1
 }
 
+// Bookings open starting March 1st, 2027
+const BOOKING_START = new Date(2027, 2, 1)
+
 export function BookingForm() {
   const today = new Date()
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth())
-  const [currentYear, setCurrentYear] = useState(today.getFullYear())
+  // Earliest bookable day = the later of today and the booking opening date
+  const minDate = today > BOOKING_START ? today : BOOKING_START
+  const minDateStr = `${minDate.getFullYear()}-${String(minDate.getMonth() + 1).padStart(2, "0")}-${String(minDate.getDate()).padStart(2, "0")}`
+  const [currentMonth, setCurrentMonth] = useState(minDate.getMonth())
+  const [currentYear, setCurrentYear] = useState(minDate.getFullYear())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([])
@@ -181,8 +187,8 @@ export function BookingForm() {
     }))
     setDistanceError(null)
 
-    // Check distance if a date is selected
-    if (selectedDate && address.latitude && address.longitude) {
+    // Check distance if a date and time are selected
+    if (selectedDate && selectedTime && address.latitude && address.longitude) {
       setIsCheckingDistance(true)
       try {
         const res = await fetch("/api/check-distance", {
@@ -190,6 +196,7 @@ export function BookingForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             date: selectedDate,
+            time: selectedTime,
             latitude: address.latitude,
             longitude: address.longitude,
           }),
@@ -249,6 +256,7 @@ export function BookingForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: selectedDate,
+          time: selectedTime,
           latitude: form.latitude,
           longitude: form.longitude,
         }),
@@ -289,11 +297,10 @@ export function BookingForm() {
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth)
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth)
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
 
   const canGoPrev =
-    currentYear > today.getFullYear() ||
-    (currentYear === today.getFullYear() && currentMonth > today.getMonth())
+    currentYear > minDate.getFullYear() ||
+    (currentYear === minDate.getFullYear() && currentMonth > minDate.getMonth())
 
   if (isSuccess) {
     return (
@@ -445,7 +452,7 @@ export function BookingForm() {
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const dayNum = i + 1
                     const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`
-                    const isPast = dateStr < todayStr
+                    const isPast = dateStr < minDateStr
                     const dayOfWeek = new Date(currentYear, currentMonth, dayNum).getDay()
                     const isSunday = dayOfWeek === 0
                     const bookedCount = getBookedCountForDate(dateStr)
@@ -453,7 +460,7 @@ export function BookingForm() {
                     const isFull = availableCount === 0
                     const isDisabled = isPast || isSunday || isFull
                     const isSelected = selectedDate === dateStr
-                    const isToday = dateStr === todayStr
+                    const isToday = dateStr === minDateStr
 
                     return (
                       <button

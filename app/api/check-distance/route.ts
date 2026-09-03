@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-const MAX_RADIUS_KM = 30
+const MAX_RADIUS_KM = 1
+
+// A slot belongs to the morning if its time is before 12:00, otherwise afternoon
+function getPeriod(time: string): "morning" | "afternoon" {
+  const hour = Number.parseInt(time.split(":")[0], 10)
+  return hour < 12 ? "morning" : "afternoon"
+}
 
 // Haversine formula to calculate distance between two points
 function haversineDistance(
@@ -25,7 +31,7 @@ function haversineDistance(
 
 export async function POST(request: NextRequest) {
   try {
-    const { date, latitude, longitude } = await request.json()
+    const { date, time, latitude, longitude } = await request.json()
 
     if (!date || !latitude || !longitude) {
       return NextResponse.json({ allowed: true })
@@ -36,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Get all confirmed/pending appointments for this date that have coordinates
     const { data: appointments } = await supabase
       .from("appointments")
-      .select("latitude, longitude")
+      .select("latitude, longitude, preferred_time")
       .eq("preferred_date", date)
       .neq("status", "cancelled")
       .not("latitude", "is", null)
@@ -47,25 +53,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ allowed: true })
     }
 
-    // Calculate center of existing appointments for this day
-    const avgLat =
-      appointments.reduce((sum, a) => sum + a.latitude, 0) / appointments.length
-    const avgLon =
-      appointments.reduce((sum, a) => sum + a.longitude, 0) / appointments.length
+    // Only compare with appointments in the same half-day (morning or afternoon)
+    const period = time ? getPeriod(time) : null
+    const relevant = period
+      ? appointments.filter((a) => getPeriod(a.preferred_time) === period)
+      : appointments
 
-    // Check distance from average center
+    if (relevant.length === 0) {
+      // No appointments in this half-day yet - allow booking
+      return NextResponse.json({ allowed: true })
+    }
+
+    const periodLabel = period === "morning" ? "la matinee" : "l'apres-midi"
+
+    // Calculate center of existing appointments for this half-day
+    const avgLat = relevant.reduce((sum, a) => sum + a.latitude, 0) / relevant.length
+    const avgLon = relevant.reduce((sum, a) => sum + a.longitude, 0) / relevant.length
+
+    // Check distance from the half-day's center
     const distance = haversineDistance(latitude, longitude, avgLat, avgLon)
 
     if (distance > MAX_RADIUS_KM) {
+      const distanceStr =
+        distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`
       return NextResponse.json({
         allowed: false,
-        distance: Math.round(distance),
+        distance,
         maxRadius: MAX_RADIUS_KM,
-        message: `Votre adresse est a ${Math.round(distance)} km du secteur d'intervention prevu ce jour (rayon max: ${MAX_RADIUS_KM} km). Veuillez choisir une autre date.`,
+        message: `Votre adresse est a ${distanceStr} du secteur deja prevu pour ${periodLabel} de cette date (rayon max : ${MAX_RADIUS_KM} km). Veuillez choisir un autre creneau.`,
       })
     }
 
-    return NextResponse.json({ allowed: true, distance: Math.round(distance) })
+    return NextResponse.json({ allowed: true, distance })
   } catch {
     // In case of error, allow booking (don't block legitimate clients)
     return NextResponse.json({ allowed: true })
