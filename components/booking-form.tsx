@@ -95,21 +95,31 @@ export function BookingForm() {
 
   const fetchBookedSlots = useCallback(async () => {
     setIsLoadingSlots(true)
+
+    // Safety timeout: never let the spinner hang more than 8s
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 8000)
+    )
+
     try {
       const supabase = createClient()
       const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`
       const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${getDaysInMonth(currentYear, currentMonth)}`
 
-      const { data, error } = await supabase
+      const query = supabase
         .from("appointments")
         .select("preferred_date, preferred_time")
         .gte("preferred_date", startDate)
         .lte("preferred_date", endDate)
         .neq("status", "cancelled")
 
+      const { data, error } = (await Promise.race([query, timeout])) as Awaited<typeof query>
+
       if (error) throw error
       setBookedSlots(data || [])
     } catch {
+      // On any error/timeout, show the calendar with no booked slots
+      // so the client can still see and pick available dates.
       setBookedSlots([])
     } finally {
       setIsLoadingSlots(false)
