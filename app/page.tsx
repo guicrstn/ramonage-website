@@ -1,9 +1,7 @@
 import { Navbar } from "@/components/navbar"
 import { Hero } from "@/components/hero"
 import { ServicesPreview } from "@/components/services-preview"
-import { Testimonials } from "@/components/testimonials"
 import { CtaSection } from "@/components/cta-section"
-import { PartnerLink } from "@/components/partner-link"
 import { Footer } from "@/components/footer"
 
 export default function HomePage() {
@@ -12,8 +10,6 @@ export default function HomePage() {
       <Navbar />
       <Hero />
       <ServicesPreview />
-      <Testimonials />
-      <PartnerLink />
       <CtaSection />
       <Footer />
     </main>
