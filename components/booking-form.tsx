@@ -74,6 +74,7 @@ export function BookingForm() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([])
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set())
   const [isLoadingSlots, setIsLoadingSlots] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -113,10 +114,20 @@ export function BookingForm() {
         .lte("preferred_date", endDate)
         .neq("status", "cancelled")
 
-      const { data, error } = (await Promise.race([query, timeout])) as Awaited<typeof query>
+      const blockedQuery = supabase
+        .from("blocked_dates")
+        .select("blocked_date")
+        .gte("blocked_date", startDate)
+        .lte("blocked_date", endDate)
 
-      if (error) throw error
-      setBookedSlots(data || [])
+      const [bookedRes, blockedRes] = (await Promise.race([
+        Promise.all([query, blockedQuery]),
+        timeout,
+      ])) as [Awaited<typeof query>, Awaited<typeof blockedQuery>]
+
+      if (bookedRes.error) throw bookedRes.error
+      setBookedSlots(bookedRes.data || [])
+      setBlockedDates(new Set((blockedRes.data || []).map((b) => b.blocked_date)))
     } catch {
       // On any error/timeout, show the calendar with no booked slots
       // so the client can still see and pick available dates.
@@ -242,6 +253,21 @@ export function BookingForm() {
 
     try {
       const supabase = createClient()
+
+      // Double-check the date has not been blocked (vacation) in the meantime
+      const { data: blocked } = await supabase
+        .from("blocked_dates")
+        .select("id")
+        .eq("blocked_date", selectedDate)
+
+      if (blocked && blocked.length > 0) {
+        toast.error("Cette date n'est plus disponible (conges). Veuillez en choisir une autre.")
+        await fetchBookedSlots()
+        setStep("calendar")
+        setSelectedTime(null)
+        setIsSubmitting(false)
+        return
+      }
 
       // Double-check the slot is still available
       const { data: existing } = await supabase
@@ -465,10 +491,11 @@ export function BookingForm() {
                     const isPast = dateStr < minDateStr
                     const dayOfWeek = new Date(currentYear, currentMonth, dayNum).getDay()
                     const isSunday = dayOfWeek === 0
+                    const isBlocked = blockedDates.has(dateStr)
                     const bookedCount = getBookedCountForDate(dateStr)
                     const availableCount = timeSlots.length - bookedCount
                     const isFull = availableCount === 0
-                    const isDisabled = isPast || isSunday || isFull
+                    const isDisabled = isPast || isSunday || isFull || isBlocked
                     const isSelected = selectedDate === dateStr
                     const isToday = dateStr === minDateStr
 
@@ -488,7 +515,7 @@ export function BookingForm() {
                         }`}
                       >
                         <span className={isSelected ? "font-bold" : ""}>{dayNum}</span>
-                        {!isPast && !isSunday && (
+                        {!isPast && !isSunday && !isBlocked && (
                           <span
                             className={`mt-0.5 text-[10px] font-semibold ${
                               isSelected
@@ -503,7 +530,10 @@ export function BookingForm() {
                             {isFull ? "Complet" : `${availableCount} dispo`}
                           </span>
                         )}
-                        {isSunday && !isPast && (
+                        {isBlocked && !isPast && (
+                          <span className="mt-0.5 text-[10px] text-muted-foreground/40">Conges</span>
+                        )}
+                        {isSunday && !isPast && !isBlocked && (
                           <span className="mt-0.5 text-[10px] text-muted-foreground/40">Ferme</span>
                         )}
                       </button>

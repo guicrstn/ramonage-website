@@ -17,7 +17,7 @@ export default async function ProtectedPage() {
   }
 
   // Fetch data server-side
-  const [appointmentsRes, messagesRes] = await Promise.all([
+  const [appointmentsRes, messagesRes, blockedRes] = await Promise.all([
     supabase
       .from("appointments")
       .select("*")
@@ -26,12 +26,17 @@ export default async function ProtectedPage() {
       .from("contact_messages")
       .select("*")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("blocked_dates")
+      .select("*")
+      .order("blocked_date", { ascending: true }),
   ])
 
   return (
     <AdminDashboard
       initialAppointments={appointmentsRes.data ?? []}
       initialMessages={messagesRes.data ?? []}
+      initialBlockedDates={blockedRes.data ?? []}
       userEmail={user.email ?? ""}
     />
   )

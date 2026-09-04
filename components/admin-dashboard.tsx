@@ -66,6 +66,13 @@ type Message = {
   created_at: string
 }
 
+type BlockedDate = {
+  id: string
+  blocked_date: string
+  reason: string | null
+  created_at: string
+}
+
 const statusColors: Record<string, string> = {
   pending: "bg-[#F5A623]/20 text-[#F5A623]",
   confirmed: "bg-emerald-500/20 text-emerald-600",
@@ -110,18 +117,94 @@ function formatDateKey(year: number, month: number, day: number) {
 export function AdminDashboard({
   initialAppointments,
   initialMessages,
+  initialBlockedDates,
   userEmail,
 }: {
   initialAppointments: Appointment[]
   initialMessages: Message[]
+  initialBlockedDates: BlockedDate[]
   userEmail: string
 }) {
   const [appointments, setAppointments] = useState(initialAppointments)
   const [messages, setMessages] = useState(initialMessages)
+  const [blockedDates, setBlockedDates] = useState(initialBlockedDates)
+  const [newBlockDate, setNewBlockDate] = useState("")
+  const [newBlockEndDate, setNewBlockEndDate] = useState("")
+  const [newBlockReason, setNewBlockReason] = useState("")
+  const [isBlocking, setIsBlocking] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const router = useRouter()
+
+  const blockedSet = useMemo(
+    () => new Set(blockedDates.map((b) => b.blocked_date)),
+    [blockedDates]
+  )
+
+  // Add one or a range of blocked (vacation) days
+  const addBlockedDates = async () => {
+    if (!newBlockDate) {
+      toast.error("Choisissez une date de debut")
+      return
+    }
+    const start = new Date(newBlockDate)
+    const end = newBlockEndDate ? new Date(newBlockEndDate) : start
+    if (end < start) {
+      toast.error("La date de fin doit etre apres la date de debut")
+      return
+    }
+
+    // Build list of dates in range, skipping already-blocked ones
+    const toInsert: { blocked_date: string; reason: string | null }[] = []
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      if (!blockedSet.has(key)) {
+        toInsert.push({ blocked_date: key, reason: newBlockReason.trim() || null })
+      }
+    }
+
+    if (toInsert.length === 0) {
+      toast.info("Ces dates sont deja bloquees")
+      return
+    }
+
+    setIsBlocking(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("blocked_dates")
+      .insert(toInsert)
+      .select()
+    setIsBlocking(false)
+
+    if (error) {
+      toast.error("Erreur lors du blocage des dates")
+      return
+    }
+
+    setBlockedDates((prev) =>
+      [...prev, ...(data ?? [])].sort((a, b) => a.blocked_date.localeCompare(b.blocked_date))
+    )
+    setNewBlockDate("")
+    setNewBlockEndDate("")
+    setNewBlockReason("")
+    toast.success(
+      toInsert.length === 1
+        ? "Date bloquee"
+        : `${toInsert.length} dates bloquees`
+    )
+  }
+
+  const removeBlockedDate = async (id: string) => {
+    const supabase = createClient()
+    const { error } = await supabase.from("blocked_dates").delete().eq("id", id)
+    if (error) {
+      toast.error("Erreur lors de la suppression")
+      return
+    }
+    setBlockedDates((prev) => prev.filter((b) => b.id !== id))
+    toast.success("Date debloquee")
+  }
 
   // Group appointments by date for calendar
   const appointmentsByDate = useMemo(() => {
@@ -425,6 +508,12 @@ export function AdminDashboard({
               Messages
               {unreadCount > 0 && (
                 <Badge className="ml-2 bg-[#F5A623] text-[#1A1A1A] text-xs">{unreadCount}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="vacances" className="data-[state=active]:bg-[#CC0000] data-[state=active]:text-white">
+              Vacances
+              {blockedDates.length > 0 && (
+                <Badge className="ml-2 bg-[#F5A623] text-[#1A1A1A] text-xs">{blockedDates.length}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -812,6 +901,135 @@ export function AdminDashboard({
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* ===================== VACANCES TAB ===================== */}
+          <TabsContent value="vacances">
+            <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+              {/* Form to block dates */}
+              <Card className="h-fit border-none shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 font-serif text-lg text-[#1A1A1A]">
+                    <CalendarDays className="h-5 w-5 text-[#CC0000]" />
+                    Bloquer des dates
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <p className="text-sm text-[#6B6B6B]">
+                    Les dates bloquees apparaissent comme indisponibles pour vos
+                    clients sur le calendrier de reservation. Ideal pour vos conges.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-[#1A1A1A]">
+                      Date de debut
+                    </label>
+                    <input
+                      type="date"
+                      value={newBlockDate}
+                      onChange={(e) => setNewBlockDate(e.target.value)}
+                      className="rounded-lg border border-[#E8E4DC] bg-white px-3 py-2 text-sm text-[#1A1A1A] focus:border-[#CC0000] focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-[#1A1A1A]">
+                      Date de fin{" "}
+                      <span className="font-normal text-[#6B6B6B]">(optionnel)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={newBlockEndDate}
+                      onChange={(e) => setNewBlockEndDate(e.target.value)}
+                      className="rounded-lg border border-[#E8E4DC] bg-white px-3 py-2 text-sm text-[#1A1A1A] focus:border-[#CC0000] focus:outline-none"
+                    />
+                    <span className="text-xs text-[#6B6B6B]">
+                      Laissez vide pour bloquer un seul jour.
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-[#1A1A1A]">
+                      Motif{" "}
+                      <span className="font-normal text-[#6B6B6B]">(optionnel)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newBlockReason}
+                      onChange={(e) => setNewBlockReason(e.target.value)}
+                      placeholder="Ex : Conges annuels"
+                      className="rounded-lg border border-[#E8E4DC] bg-white px-3 py-2 text-sm text-[#1A1A1A] placeholder:text-[#B0AEA8] focus:border-[#CC0000] focus:outline-none"
+                    />
+                  </div>
+                  <Button
+                    onClick={addBlockedDates}
+                    disabled={isBlocking}
+                    className="bg-[#CC0000] text-white hover:bg-[#A30000]"
+                  >
+                    {isBlocking ? "Blocage..." : "Bloquer ces dates"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* List of blocked dates */}
+              <Card className="border-none shadow-sm">
+                <CardHeader>
+                  <CardTitle className="font-serif text-lg text-[#1A1A1A]">
+                    Dates bloquees ({blockedDates.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {blockedDates.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-12 text-center">
+                      <CalendarDays className="h-10 w-10 text-[#E8E4DC]" />
+                      <p className="text-sm text-[#6B6B6B]">
+                        Aucune date bloquee pour le moment.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {blockedDates.map((b) => {
+                        const d = new Date(b.blocked_date + "T00:00:00")
+                        const label = d.toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })
+                        const isPast =
+                          b.blocked_date <
+                          new Date().toISOString().slice(0, 10)
+                        return (
+                          <div
+                            key={b.id}
+                            className={`flex items-center justify-between rounded-lg border border-[#E8E4DC] px-4 py-3 ${
+                              isPast ? "opacity-50" : ""
+                            }`}
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold capitalize text-[#1A1A1A]">
+                                {label}
+                              </span>
+                              {b.reason && (
+                                <span className="text-xs text-[#6B6B6B]">
+                                  {b.reason}
+                                </span>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeBlockedDate(b.id)}
+                              className="text-[#CC0000] hover:bg-[#CC0000]/10 hover:text-[#CC0000]"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Debloquer</span>
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
