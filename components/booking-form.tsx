@@ -27,11 +27,17 @@ import {
 import { toast } from "sonner"
 import { AddressAutocomplete, type AddressResult } from "@/components/address-autocomplete"
 
-// 30-minute slots from 8:00 to 17:30, break at 12:00-13:00
-const timeSlots = [
-  "08:00", "09:00", "10:00", "11:00",
-  "14:00", "15:00", "16:00",
-]
+// 1h30 slots with a lunch break from 12:30 to 13:30.
+// Weekdays (Mon-Fri): 08:00-09:30, 09:30-11:00, 11:00-12:30, [pause], 13:30-15:00, 15:00-16:30, 16:30-18:00
+const WEEKDAY_SLOTS = ["08:00", "09:30", "11:00", "13:30", "15:00", "16:30"]
+// Saturday: 08:00 to 12:30 only (08:00-09:30, 09:30-11:00, 11:00-12:30)
+const SATURDAY_SLOTS = ["08:00", "09:30", "11:00"]
+
+// Returns the bookable slots for a given date (Saturday has a shorter schedule)
+function getSlotsForDate(dateStr: string): string[] {
+  const day = new Date(dateStr + "T00:00:00").getDay()
+  return day === 6 ? SATURDAY_SLOTS : WEEKDAY_SLOTS
+}
 
 const serviceTypes = [
   { value: "forfait-bois-insert", label: "Forfait Ramonage : bois / insert" },
@@ -158,7 +164,7 @@ export function BookingForm() {
   }
 
   const getAvailableSlotsForDate = (date: string) => {
-    return timeSlots.filter((time) => !isSlotBooked(date, time))
+    return getSlotsForDate(date).filter((time) => !isSlotBooked(date, time))
   }
 
   const handlePrevMonth = () => {
@@ -432,7 +438,7 @@ export function BookingForm() {
                 </span>
               </div>
               <CardDescription>
-                  Creneaux d{"'"}1 heure. Les creneaux reserves par d{"'"}autres clients sont automatiquement indisponibles.
+                  Creneaux d{"'"}1h30. Les creneaux reserves par d{"'"}autres clients sont automatiquement indisponibles.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -491,7 +497,7 @@ export function BookingForm() {
                     const isSunday = dayOfWeek === 0
                     const isBlocked = blockedDates.has(dateStr)
                     const bookedCount = getBookedCountForDate(dateStr)
-                    const availableCount = timeSlots.length - bookedCount
+                    const availableCount = getSlotsForDate(dateStr).length - bookedCount
                     const isFull = availableCount === 0
                     const isDisabled = isPast || isSunday || isFull || isBlocked
                     const isSelected = selectedDate === dateStr
@@ -572,14 +578,14 @@ export function BookingForm() {
                   })}
                 </CardTitle>
                 <CardDescription>
-                  Creneaux d{"'"}1 heure. Les creneaux gris sont deja pris par d{"'"}autres clients.
+                  Creneaux d{"'"}1h30. Pause de 12h30 a 13h30. Le samedi : 8h a 12h30. Les creneaux gris sont deja pris par d{"'"}autres clients.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {/* Morning slots */}
                 <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Matin</p>
                 <div className="mb-4 grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-8">
-                  {timeSlots.filter(t => parseInt(t) < 12).map((time) => {
+                  {getSlotsForDate(selectedDate).filter(t => parseInt(t) < 12).map((time) => {
                     const booked = isSlotBooked(selectedDate, time)
                     const selected = selectedTime === time
 
@@ -605,34 +611,38 @@ export function BookingForm() {
                   })}
                 </div>
 
-                {/* Afternoon slots */}
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Apres-midi</p>
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-8">
-                  {timeSlots.filter(t => parseInt(t) >= 13).map((time) => {
-                    const booked = isSlotBooked(selectedDate, time)
-                    const selected = selectedTime === time
+                {/* Afternoon slots (none on Saturday) */}
+                {getSlotsForDate(selectedDate).some(t => parseInt(t) >= 13) && (
+                  <>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Apres-midi</p>
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-8">
+                      {getSlotsForDate(selectedDate).filter(t => parseInt(t) >= 13).map((time) => {
+                        const booked = isSlotBooked(selectedDate, time)
+                        const selected = selectedTime === time
 
-                    return (
-                      <button
-                        key={time}
-                        onClick={() => !booked && handleTimeClick(time)}
-                        disabled={booked}
-                        className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2.5 text-sm font-semibold transition-all ${
-                          selected
-                            ? "border-[#CC0000] bg-[#CC0000] text-white shadow-lg"
-                            : booked
-                              ? "cursor-not-allowed border-border bg-muted/50 text-muted-foreground/40 line-through"
-                              : "border-border bg-card text-card-foreground hover:border-[#CC0000] hover:bg-[#CC0000]/5"
-                        }`}
-                      >
-                        {time}
-                        <span className={`text-[9px] font-normal ${selected ? "text-white/80" : booked ? "text-muted-foreground/30" : "text-[#2E7D32]"}`}>
-                          {booked ? "Pris" : "Libre"}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+                        return (
+                          <button
+                            key={time}
+                            onClick={() => !booked && handleTimeClick(time)}
+                            disabled={booked}
+                            className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2.5 text-sm font-semibold transition-all ${
+                              selected
+                                ? "border-[#CC0000] bg-[#CC0000] text-white shadow-lg"
+                                : booked
+                                  ? "cursor-not-allowed border-border bg-muted/50 text-muted-foreground/40 line-through"
+                                  : "border-border bg-card text-card-foreground hover:border-[#CC0000] hover:bg-[#CC0000]/5"
+                            }`}
+                          >
+                            {time}
+                            <span className={`text-[9px] font-normal ${selected ? "text-white/80" : booked ? "text-muted-foreground/30" : "text-[#2E7D32]"}`}>
+                              {booked ? "Pris" : "Libre"}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
 
                 {selectedTime && (
                   <div className="mt-5 flex justify-end">
