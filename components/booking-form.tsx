@@ -34,11 +34,9 @@ const timeSlots = [
 ]
 
 const serviceTypes = [
-  { value: "ramonage", label: "Ramonage de cheminee" },
-  { value: "entretien-poele", label: "Entretien de poele / insert" },
-  { value: "depannage", label: "Depannage / Reparation" },
-  { value: "mise-en-conformite", label: "Mise en conformite" },
-  { value: "autre", label: "Autre (precisez dans le message)" },
+  { value: "forfait-bois-insert", label: "Forfait Ramonage : bois / insert" },
+  { value: "forfait-granules", label: "Forfait Ramonage : entretien poele a granules" },
+  { value: "forfait-mixte", label: "Forfait Ramonage : entretien poele a granules / bois (mixte)" },
 ]
 
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
