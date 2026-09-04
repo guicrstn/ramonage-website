@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 // Email de l'admin qui recoit les notifications de nouveau RDV
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@lb-ramonage.fr"
 // L'adresse d'envoi - par defaut Resend fournit onboarding@resend.dev
@@ -153,6 +151,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const emailsToSend = []
 
     // Send to client (if they have an email)
