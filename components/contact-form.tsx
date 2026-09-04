@@ -6,7 +6,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+
+const SERVICE_OPTIONS = [
+  "Forfait Ramonage : bois / insert",
+  "Forfait Ramonage : entretien poele a granules",
+  "Forfait Ramonage : entretien poele a granules / bois (mixte)",
+]
 import { Send, CheckCircle2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -130,15 +143,23 @@ export function ContactForm() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="contact_subject">Sujet *</Label>
-              <Input
-                id="contact_subject"
-                name="subject"
+              <Label htmlFor="contact_subject">Type de service *</Label>
+              <Select
                 value={form.subject}
-                onChange={handleChange}
-                placeholder="Demande d'information"
+                onValueChange={(value) => setForm((prev) => ({ ...prev, subject: value }))}
                 required
-              />
+              >
+                <SelectTrigger id="contact_subject">
+                  <SelectValue placeholder="Choisissez un forfait" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SERVICE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
