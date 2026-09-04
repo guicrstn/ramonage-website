@@ -326,6 +326,23 @@ export function BookingForm() {
 
       if (error) throw error
 
+      // Notify the business owner by email (non-blocking: booking already saved)
+      fetch("/api/notify-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "appointment",
+          full_name: form.full_name,
+          phone: form.phone,
+          email: form.email || null,
+          address: `${form.address}${form.city ? ", " + form.city : ""}`,
+          service_type: form.service_type,
+          preferred_date: selectedDate,
+          preferred_time: selectedTime,
+          message: form.message || null,
+        }),
+      }).catch(() => {})
+
       setIsSuccess(true)
       toast.success("Rendez-vous reserve avec succes !")
     } catch {

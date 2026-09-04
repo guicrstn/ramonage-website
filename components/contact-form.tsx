@@ -54,6 +54,20 @@ export function ContactForm() {
 
       if (error) throw error
 
+      // Notify the business owner by email (non-blocking: message already saved)
+      fetch("/api/notify-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "contact",
+          full_name: form.full_name,
+          email: form.email,
+          phone: form.phone || null,
+          subject: form.subject,
+          message: form.message,
+        }),
+      }).catch(() => {})
+
       setIsSuccess(true)
       toast.success("Message envoye avec succes !")
     } catch {
